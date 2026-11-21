@@ -2,6 +2,7 @@ package com.bothost.app
 
 import android.Manifest
 import android.app.Activity
+import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -18,6 +19,29 @@ import android.widget.TextView
 import android.widget.Toast
 
 class MainActivity : Activity() {
+
+    private val zipPicker = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                val bot = BotManager.importZip(this, uri)
+                Toast.makeText(
+                    this,
+                    "Imported ${bot.name} (${bot.runtime})",
+                    Toast.LENGTH_LONG
+                ).show()
+                buildDashboard()
+            } catch (e: Exception) {
+                Toast.makeText(
+                    this,
+                    "Import failed: ${e.message}",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
 
     private val bg = Color.rgb(8, 12, 25)
     private val panel = Color.rgb(17, 26, 46)
@@ -206,11 +230,7 @@ class MainActivity : Activity() {
 
         val add = actionButton("+ ADD BOT", cyan)
         add.setOnClickListener {
-            Toast.makeText(
-                this@MainActivity,
-                "Bot importing is coming in the next development step.",
-                Toast.LENGTH_LONG
-            ).show()
+            zipPicker.launch("*/*")
         }
         botsHeader.addView(add)
 
