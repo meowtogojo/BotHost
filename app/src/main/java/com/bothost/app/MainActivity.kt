@@ -1,9 +1,9 @@
-import android.net.Uri
-import androidx.activity.ComponentActivity
 package com.bothost.app
 
+import android.net.Uri
+import androidx.activity.ComponentActivity
+
 import android.Manifest
-import android.app.Activity
 import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Intent
 import android.content.pm.PackageManager
