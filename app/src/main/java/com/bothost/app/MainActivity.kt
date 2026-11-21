@@ -71,6 +71,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun buildDashboard() {
+        val importedBots = BotManager.getBots(this)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(bg)
@@ -156,7 +157,7 @@ class MainActivity : ComponentActivity() {
         stats.addView(gap, LinearLayout.LayoutParams(dp(12), 1))
 
         stats.addView(
-            statCard("0", "IMPORTED BOTS", purple),
+            statCard(importedBots.size.toString(), "IMPORTED BOTS", purple),
             LinearLayout.LayoutParams(0, dp(105), 1f)
         )
 
@@ -239,21 +240,60 @@ class MainActivity : ComponentActivity() {
         content.addView(botsHeader)
         content.addView(space(10))
 
-        val empty = card(panel).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(dp(18), dp(25), dp(18), dp(25))
-        }
+if (importedBots.isEmpty()) {
+                val empty = card(panel).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = Gravity.CENTER
+                    setPadding(dp(18), dp(25), dp(18), dp(25))
+                }
+                empty.addView(label("◈", 34f, cyan, true))
+                empty.addView(space(8))
+                empty.addView(label("No bots imported yet", 16f, white, true))
+                empty.addView(space(6))
+                empty.addView(label("Import a bot ZIP to get started.", 12f, muted))
+                content.addView(empty)
+            } else {
+                importedBots.forEach { bot ->
+                    val botPanel = card(panel).apply {
+                        orientation = LinearLayout.VERTICAL
+                        setPadding(dp(15), dp(14), dp(15), dp(14))
+                    }
 
-        empty.addView(label("◈", 34f, cyan, true))
-        empty.addView(space(8))
-        empty.addView(label("No bots imported yet", 16f, white, true))
-        empty.addView(space(6))
-        empty.addView(
-            label("Your Python and JavaScript bots will appear here.", 12f, muted)
-        )
+                    val row = LinearLayout(this).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER_VERTICAL
+                    }
 
-        content.addView(empty)
+                    val details = LinearLayout(this).apply {
+                        orientation = LinearLayout.VERTICAL
+                    }
+                    details.addView(label(bot.name, 16f, white, true))
+                    details.addView(space(5))
+                    details.addView(label("${bot.runtime} • ${bot.entryFile}", 11f, muted))
+
+                    row.addView(details, LinearLayout.LayoutParams(0, -2, 1f))
+
+                    val delete = actionButton("DELETE", purple)
+                    row.addView(delete, LinearLayout.LayoutParams(dp(88), dp(44)))
+
+                    delete.setOnClickListener {
+                        android.app.AlertDialog.Builder(this@MainActivity)
+                            .setTitle("Delete ${bot.name}?")
+                            .setMessage("This removes the imported bot files from BotHost.")
+                            .setNegativeButton("CANCEL", null)
+                            .setPositiveButton("DELETE") { _, _ ->
+                                BotManager.deleteBot(this@MainActivity, bot.id)
+                                Toast.makeText(this@MainActivity, "Bot deleted", Toast.LENGTH_SHORT).show()
+                                buildDashboard()
+                            }
+                            .show()
+                    }
+
+                    botPanel.addView(row)
+                    content.addView(botPanel)
+                    content.addView(space(10))
+                }
+            }
         content.addView(space(22))
 
         // Console preview
