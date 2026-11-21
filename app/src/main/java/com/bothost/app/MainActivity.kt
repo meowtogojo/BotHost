@@ -1,3 +1,5 @@
+import android.net.Uri
+import androidx.activity.ComponentActivity
 package com.bothost.app
 
 import android.Manifest
@@ -18,7 +20,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 
-class MainActivity : Activity() {
+class MainActivity : ComponentActivity() {
 
     private val zipPicker = registerForActivityResult(
         ActivityResultContracts.GetContent()
