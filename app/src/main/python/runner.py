@@ -263,4 +263,4 @@ def get_logs(bot_id):
 def get_error(bot_id):
     with _lock:
         state = _bots.get(bot_id)
-        return state["error"] if state else None
+        return (state.get("error") or "") if state else ""

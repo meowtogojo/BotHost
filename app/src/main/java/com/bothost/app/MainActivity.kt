@@ -105,21 +105,45 @@ class MainActivity : ComponentActivity() {
         statusExecutor.scheduleWithFixedDelay({
             try {
                 val bots = BotManager.getBots(this)
+
                 var running = 0
 
                 val statuses = bots.map { bot ->
+                    var details: String? = null
+
                     val status = try {
                         if (bot.runtime == "Python") {
-                            BotRuntime.getStatus(this, bot.id)
+                            val current = BotRuntime.getStatus(this, bot.id)
+
+                            if (current == "error") {
+                                val error = BotRuntime.getError(this, bot.id)
+                                val logs = BotRuntime.getLogs(this, bot.id)
+
+                                details = buildString {
+                                    append(
+                                        error?.takeIf { it.isNotBlank() }
+                                            ?: "No Python traceback was recorded."
+                                    )
+
+                                    if (logs.isNotBlank()) {
+                                        append("\\n\\n--- BOT LOGS ---\\n")
+                                        append(logs)
+                                    }
+                                }
+                            }
+
+                            current
                         } else {
                             "unsupported"
                         }
-                    } catch (_: Exception) {
+                    } catch (e: Exception) {
+                        details = e.stackTraceToString()
                         "error"
                     }
 
                     if (status == "running") running++
-                    bot.id to status
+
+                    Triple(bot.id, status, details)
                 }
 
                 handler.post {
@@ -127,9 +151,10 @@ class MainActivity : ComponentActivity() {
                         runningCount.text = running.toString()
                         importedCount.text = bots.size.toString()
 
-                        statuses.forEach { (id, status) ->
+                        statuses.forEach { (id, status, details) ->
                             statusViews[id]?.apply {
                                 text = "STATUS: ${status.uppercase()}"
+
                                 setTextColor(
                                     when (status) {
                                         "running" -> green
@@ -138,12 +163,27 @@ class MainActivity : ComponentActivity() {
                                         else -> muted
                                     }
                                 )
+
+                                isClickable = status == "error"
+
+                                setOnClickListener {
+                                    if (status == "error") {
+                                        AlertDialog.Builder(this@MainActivity)
+                                            .setTitle("Bot startup error")
+                                            .setMessage(
+                                                details
+                                                    ?: "No error details available."
+                                            )
+                                            .setPositiveButton("CLOSE", null)
+                                            .show()
+                                    }
+                                }
                             }
                         }
                     }
                 }
             } catch (_: Exception) {
-                // A temporary status-check failure should not crash the dashboard.
+                // Keep dashboard alive during temporary status failures.
             }
         }, 0, 2, TimeUnit.SECONDS)
     }
