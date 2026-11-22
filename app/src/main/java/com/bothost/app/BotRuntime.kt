@@ -1,9 +1,8 @@
-
 package com.bothost.app
 
 import android.content.Context
-import com.chaquo.python.AndroidPlatform
 import com.chaquo.python.Python
+import com.chaquo.python.android.AndroidPlatform
 import java.io.File
 
 object BotRuntime {
@@ -11,7 +10,9 @@ object BotRuntime {
     @Synchronized
     fun initialize(context: Context) {
         if (!Python.isStarted()) {
-            Python.start(AndroidPlatform(context.applicationContext))
+            Python.start(
+                AndroidPlatform(context.applicationContext)
+            )
         }
     }
 
@@ -45,24 +46,33 @@ object BotRuntime {
 
     fun stopBot(context: Context, botId: String): String {
         initialize(context)
-        return runner(context).callAttr("stop_bot", botId).toString()
+        return runner(context)
+            .callAttr("stop_bot", botId)
+            .toString()
     }
 
     fun getStatus(context: Context, botId: String): String {
-        initialize(context)
-        return runner(context).callAttr("get_status", botId).toString()
+        if (!Python.isStarted()) return "stopped"
+
+        return runner(context)
+            .callAttr("get_status", botId)
+            .toString()
     }
 
     fun getLogs(context: Context, botId: String): String {
-        initialize(context)
-        return runner(context).callAttr("get_logs", botId).toString()
+        if (!Python.isStarted()) return ""
+
+        return runner(context)
+            .callAttr("get_logs", botId)
+            .toString()
     }
 
     fun getError(context: Context, botId: String): String? {
-        initialize(context)
+        if (!Python.isStarted()) return null
 
-        val result = runner(context).callAttr("get_error", botId)
+        val result = runner(context)
+            .callAttr("get_error", botId)
 
-        return if (result.isNone()) null else result.toString()
+        return result?.toString()
     }
 }
