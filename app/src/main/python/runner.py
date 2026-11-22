@@ -258,20 +258,30 @@ def stop_bot(bot_id):
             state["status"] = "stopped"
             return "stopped"
 
-        if client is None or loop is None or loop.is_closed():
-            state["stop_requested"] = True
-            state["status"] = "stopping"
-            return "stop requested"
-
+        state["stop_requested"] = True
         state["status"] = "stopping"
 
-        asyncio.run_coroutine_threadsafe(
-            client.close(),
-            loop
-        )
+    if client is not None and loop is not None and not loop.is_closed():
+        try:
+            future = asyncio.run_coroutine_threadsafe(
+                client.close(),
+                loop
+            )
+            future.result(timeout=10)
+        except Exception:
+            pass
 
+    thread.join(timeout=10)
+
+    with _lock:
+        if not thread.is_alive():
+            state["status"] = "stopped"
+            state["client"] = None
+            state["loop"] = None
+            return "stopped"
+
+        state["status"] = "stopping"
         return "stopping"
-
 
 def get_status(bot_id):
     with _lock:

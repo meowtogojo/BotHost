@@ -491,18 +491,74 @@ class MainActivity : ComponentActivity() {
                     AlertDialog.Builder(this@MainActivity)
                         .setTitle("Delete ${bot.name}?")
                         .setMessage(
-                            "This removes the imported bot files from BotHost."
+                            "BotHost will stop this bot before deleting its files and token."
                         )
                         .setNegativeButton("CANCEL", null)
                         .setPositiveButton("DELETE") { _, _ ->
-                            TokenStore.deleteToken(this@MainActivity, bot.id)
-                            BotManager.deleteBot(this@MainActivity, bot.id)
-                            Toast.makeText(
-                                this@MainActivity,
-                                "Bot deleted",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                            buildDashboard()
+                            delete.isEnabled = false
+                            delete.text = "STOPPING..."
+
+                            try {
+                                startServiceCommand(
+                                    BotHostService.ACTION_STOP_BOT,
+                                    bot.id
+                                )
+
+                                Thread {
+                                    try {
+                                        var stopped = false
+                                        val deadline = System.currentTimeMillis() + 25000
+
+                                        while (System.currentTimeMillis() < deadline) {
+                                            Thread.sleep(500)
+
+                                            val currentStatus =
+                                                BotRuntime.getStatus(this@MainActivity, bot.id)
+
+                                            if (currentStatus == "stopped") {
+                                                stopped = true
+                                                break
+                                            }
+                                        }
+
+                                        if (!stopped) {
+                                            throw IllegalStateException(
+                                                "Bot did not confirm shutdown. Nothing was deleted."
+                                            )
+                                        }
+
+                                        TokenStore.deleteToken(this@MainActivity, bot.id)
+                                        BotManager.deleteBot(this@MainActivity, bot.id)
+
+                                        handler.post {
+                                            Toast.makeText(
+                                                this@MainActivity,
+                                                "Bot stopped and deleted",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                            buildDashboard()
+                                        }
+                                    } catch (e: Exception) {
+                                        handler.post {
+                                            delete.isEnabled = true
+                                            delete.text = "DELETE"
+                                            Toast.makeText(
+                                                this@MainActivity,
+                                                "Delete failed: ${e.message}",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                    }
+                                }.start()
+                            } catch (e: Exception) {
+                                delete.isEnabled = true
+                                delete.text = "DELETE"
+                                Toast.makeText(
+                                    this@MainActivity,
+                                    "Stop request failed: ${e.message}",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
                         }
                         .show()
                 }
