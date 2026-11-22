@@ -11,6 +11,28 @@ _local = threading.local()
 _bots = {}
 _logs = {}
 
+_original_getenv = os.getenv
+
+def _bothost_getenv(key, default=None):
+    if key == "DISCORD_TOKEN":
+        token = getattr(_local, "discord_token", None)
+        if token is not None:
+            return token
+    return _original_getenv(key, default)
+
+os.getenv = _bothost_getenv
+
+_original_environ_get = os.environ.get
+
+def _bothost_environ_get(key, default=None):
+    if key == "DISCORD_TOKEN":
+        token = getattr(_local, "discord_token", None)
+        if token is not None:
+            return token
+    return _original_environ_get(key, default)
+
+os.environ.get = _bothost_environ_get
+
 
 class BotLogStream:
     def __init__(self, original):
@@ -129,7 +151,7 @@ def _install_discord_bridge():
     return True
 
 
-def run_script(script_path, bot_id):
+def run_script(script_path, bot_id, token=""):
     path = os.path.abspath(script_path)
 
     if not os.path.isfile(path):
@@ -156,6 +178,7 @@ def run_script(script_path, bot_id):
 
     def target():
         _local.bot_id = bot_id
+        _local.discord_token = token
         added_path = False
 
         try:
@@ -197,6 +220,11 @@ def run_script(script_path, bot_id):
 
             try:
                 del _local.bot_id
+            except AttributeError:
+                pass
+
+            try:
+                del _local.discord_token
             except AttributeError:
                 pass
 

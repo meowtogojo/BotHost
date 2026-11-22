@@ -10,16 +10,18 @@ object BotRuntime {
     @Synchronized
     fun initialize(context: Context) {
         if (!Python.isStarted()) {
-            Python.start(
-                AndroidPlatform(context.applicationContext)
-            )
+            Python.start(AndroidPlatform(context.applicationContext))
         }
     }
 
     private fun runner(context: Context) =
         Python.getInstance().getModule("runner")
 
-    fun startBot(context: Context, bot: BotInfo): String {
+    fun startBot(
+        context: Context,
+        bot: BotInfo,
+        token: String
+    ): String {
         initialize(context)
 
         if (bot.runtime != "Python") {
@@ -40,39 +42,32 @@ object BotRuntime {
         }
 
         return runner(context)
-            .callAttr("run_script", script.absolutePath, bot.id)
+            .callAttr(
+                "run_script",
+                script.absolutePath,
+                bot.id,
+                token
+            )
             .toString()
     }
 
     fun stopBot(context: Context, botId: String): String {
         initialize(context)
-        return runner(context)
-            .callAttr("stop_bot", botId)
-            .toString()
+        return runner(context).callAttr("stop_bot", botId).toString()
     }
 
     fun getStatus(context: Context, botId: String): String {
         if (!Python.isStarted()) return "stopped"
-
-        return runner(context)
-            .callAttr("get_status", botId)
-            .toString()
+        return runner(context).callAttr("get_status", botId).toString()
     }
 
     fun getLogs(context: Context, botId: String): String {
         if (!Python.isStarted()) return ""
-
-        return runner(context)
-            .callAttr("get_logs", botId)
-            .toString()
+        return runner(context).callAttr("get_logs", botId).toString()
     }
 
     fun getError(context: Context, botId: String): String? {
         if (!Python.isStarted()) return null
-
-        val result = runner(context)
-            .callAttr("get_error", botId)
-
-        return result?.toString()
+        return runner(context).callAttr("get_error", botId)?.toString()
     }
 }

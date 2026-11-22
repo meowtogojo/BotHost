@@ -68,7 +68,12 @@ class BotHostService : Service() {
                                 .firstOrNull { it.id == botId }
                                 ?: throw IllegalArgumentException("Bot not found")
 
-                            BotRuntime.startBot(this, bot)
+                            val token = TokenStore.getToken(this, botId)
+                                ?: throw IllegalStateException(
+                                    "No Discord token configured for this bot"
+                                )
+
+                            BotRuntime.startBot(this, bot, token)
 
                         } catch (e: Exception) {
                             Log.e(TAG, "Could not start bot $botId", e)

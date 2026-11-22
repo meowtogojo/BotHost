@@ -14,6 +14,8 @@ import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
+import android.widget.EditText
+import android.text.InputType
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -441,6 +443,15 @@ class MainActivity : ComponentActivity() {
                                 Toast.LENGTH_LONG
                             ).show()
                         } else {
+                            if (TokenStore.getToken(this@MainActivity, bot.id).isNullOrBlank()) {
+                                Toast.makeText(
+                                    this@MainActivity,
+                                    "Set this bot's Discord token first.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                                return@setOnClickListener
+                            }
+
                             startServiceCommand(
                                 BotHostService.ACTION_START_BOT,
                                 bot.id
@@ -484,6 +495,7 @@ class MainActivity : ComponentActivity() {
                         )
                         .setNegativeButton("CANCEL", null)
                         .setPositiveButton("DELETE") { _, _ ->
+                            TokenStore.deleteToken(this@MainActivity, bot.id)
                             BotManager.deleteBot(this@MainActivity, bot.id)
                             Toast.makeText(
                                 this@MainActivity,
@@ -511,6 +523,64 @@ class MainActivity : ComponentActivity() {
                 )
 
                 botPanel.addView(botButtons)
+
+                val tokenButton = actionButton("SET TOKEN", cyan)
+                tokenButton.setOnClickListener {
+                    val tokenInput = EditText(this@MainActivity).apply {
+                        inputType = InputType.TYPE_CLASS_TEXT or
+                            InputType.TYPE_TEXT_VARIATION_PASSWORD
+                        hint = "Paste this bot's Discord token"
+                        setSingleLine(true)
+                        setText(TokenStore.getToken(this@MainActivity, bot.id) ?: "")
+                    }
+
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle("Discord token • ${bot.name}")
+                        .setMessage("This token is encrypted and stored on this device.")
+                        .setView(tokenInput)
+                        .setNegativeButton("CANCEL", null)
+                        .setNeutralButton("CLEAR") { _, _ ->
+                            TokenStore.deleteToken(this@MainActivity, bot.id)
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Token cleared",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                        .setPositiveButton("SAVE") { _, _ ->
+                            val value = tokenInput.text.toString().trim()
+                            if (value.isNotEmpty()) {
+                                try {
+                                    TokenStore.saveToken(
+                                        this@MainActivity,
+                                        bot.id,
+                                        value
+                                    )
+                                    Toast.makeText(
+                                        this@MainActivity,
+                                        "Token saved securely",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                } catch (e: Exception) {
+                                    Toast.makeText(
+                                        this@MainActivity,
+                                        "Token save failed: ${e.message}",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            } else {
+                                Toast.makeText(
+                                    this@MainActivity,
+                                    "Enter a token first",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                        .show()
+                }
+
+                content.addView(tokenButton)
+                content.addView(space(8))
                 content.addView(botPanel)
                 content.addView(space(10))
             }
