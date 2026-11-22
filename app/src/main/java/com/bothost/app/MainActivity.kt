@@ -21,33 +21,12 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.result.contract.ActivityResultContracts
+import org.json.JSONArray
+import org.json.JSONObject
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
-
-    private val zipPicker = registerForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri ->
-        if (uri != null) {
-            try {
-                val bot = BotManager.importZip(this, uri)
-                Toast.makeText(
-                    this,
-                    "Imported ${bot.name} (${bot.runtime})",
-                    Toast.LENGTH_LONG
-                ).show()
-                buildDashboard()
-            } catch (e: Exception) {
-                Toast.makeText(
-                    this,
-                    "Import failed: ${e.message}",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-        }
-    }
 
     private val bg = Color.rgb(8, 12, 25)
     private val panel = Color.rgb(17, 26, 46)
@@ -59,7 +38,6 @@ class MainActivity : ComponentActivity() {
     private val green = Color.rgb(75, 220, 145)
     private val red = Color.rgb(255, 100, 110)
 
-    private lateinit var serviceStatus: TextView
     private lateinit var runningCount: TextView
     private lateinit var importedCount: TextView
 
@@ -254,18 +232,6 @@ class MainActivity : ComponentActivity() {
         )
         hero.addView(space(18))
 
-        val onlineRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        onlineRow.addView(label("●", 14f, green))
-        onlineRow.addView(spaceHorizontal(8))
-
-        serviceStatus = label("BOT HOST CONTROL CENTER", 11f, white, true)
-        onlineRow.addView(serviceStatus)
-
-        hero.addView(onlineRow)
         content.addView(hero)
         content.addView(space(22))
 
@@ -282,7 +248,7 @@ class MainActivity : ComponentActivity() {
 
         val importedCard = statCard(
             importedBots.size.toString(),
-            "IMPORTED BOTS",
+            "APPLICATIONS",
             purple
         )
         importedCount = importedCard.getChildAt(0) as TextView
@@ -302,74 +268,6 @@ class MainActivity : ComponentActivity() {
         content.addView(stats)
         content.addView(space(22))
 
-        // Host controls
-        content.addView(label("HOST CONTROLS", 13f, muted, true))
-        content.addView(space(10))
-
-        val controls = card(panel).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(16), dp(16), dp(16))
-        }
-
-        controls.addView(label("Hosting service", 17f, white, true))
-        controls.addView(space(5))
-        controls.addView(
-            label(
-                "Manage your background bot-hosting service.",
-                12f,
-                muted
-            )
-        )
-        controls.addView(space(16))
-
-        val buttons = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-        }
-
-        val start = actionButton("START HOST", cyan)
-        start.setOnClickListener {
-            try {
-                startServiceCommand()
-                serviceStatus.text = "HOST SERVICE START REQUESTED"
-                Toast.makeText(
-                    this,
-                    "Host service start requested",
-                    Toast.LENGTH_SHORT
-                ).show()
-            } catch (e: Exception) {
-                Toast.makeText(
-                    this,
-                    "Could not start service: ${e.message}",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-        }
-
-        val stop = actionButton("STOP HOST", purple)
-        stop.setOnClickListener {
-            try {
-                startServiceCommand(BotHostService.ACTION_STOP_HOST)
-                serviceStatus.text = "HOST STOP REQUESTED"
-                Toast.makeText(
-                    this,
-                    "Host stop requested",
-                    Toast.LENGTH_SHORT
-                ).show()
-            } catch (e: Exception) {
-                Toast.makeText(
-                    this,
-                    "Could not stop host: ${e.message}",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-        }
-
-        buttons.addView(start, LinearLayout.LayoutParams(0, dp(48), 1f))
-        buttons.addView(spaceHorizontal(10))
-        buttons.addView(stop, LinearLayout.LayoutParams(0, dp(48), 1f))
-
-        controls.addView(buttons)
-        content.addView(controls)
         content.addView(space(22))
 
         // Bot list header
@@ -379,14 +277,12 @@ class MainActivity : ComponentActivity() {
         }
 
         botsHeader.addView(
-            label("YOUR BOTS", 13f, muted, true),
+            label("MY APPLICATIONS", 13f, muted, true),
             LinearLayout.LayoutParams(0, -2, 1f)
         )
 
-        val add = actionButton("+ ADD BOT", cyan)
-        add.setOnClickListener {
-            zipPicker.launch("*/*")
-        }
+        val add = actionButton("+ NEW APPLICATION", cyan)
+        add.setOnClickListener { createApplication() }
 
         botsHeader.addView(add)
         content.addView(botsHeader)
@@ -401,10 +297,10 @@ class MainActivity : ComponentActivity() {
 
             empty.addView(label("◈", 34f, cyan, true))
             empty.addView(space(8))
-            empty.addView(label("No bots imported yet", 16f, white, true))
+            empty.addView(label("No applications created yet", 16f, white, true))
             empty.addView(space(6))
             empty.addView(
-                label("Import a bot ZIP to get started.", 12f, muted)
+                label("Create your first bot application to get started.", 12f, muted)
             )
 
             content.addView(empty)
@@ -636,6 +532,23 @@ class MainActivity : ComponentActivity() {
                 }
 
                 content.addView(tokenButton)
+                content.addView(space(7))
+
+                val editCodeButton = actionButton("OPEN CODE EDITOR", purple)
+                editCodeButton.setOnClickListener {
+                    openCodeEditor(bot)
+                }
+                content.addView(editCodeButton)
+        content.addView(space(7))
+
+        val filesButton = actionButton("OPEN FILE MANAGER", cyan)
+        filesButton.setOnClickListener { openFileManager(bot) }
+        content.addView(filesButton)
+            content.addView(space(7))
+
+            val slashButton = actionButton("OPEN SLASH COMMANDS", purple)
+            slashButton.setOnClickListener { openSlashCommands(bot) }
+            content.addView(slashButton)
                 content.addView(space(8))
                 content.addView(botPanel)
                 content.addView(space(10))
@@ -721,6 +634,498 @@ class MainActivity : ComponentActivity() {
 
         root.addView(nav)
         setContentView(root)
+    }
+
+
+    private fun createApplication() {
+        val nameInput = EditText(this).apply {
+            hint = "Application name"
+            setSingleLine(true)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("New Application")
+            .setMessage("Create a new Discord bot project.")
+            .setView(nameInput)
+            .setNegativeButton("CANCEL", null)
+            .setPositiveButton("CREATE") { _, _ ->
+                try {
+                    val bot = BotManager.createProject(
+                        this,
+                        nameInput.text.toString()
+                    )
+
+                    Toast.makeText(
+                        this,
+                        "Application created",
+                        Toast.LENGTH_SHORT
+                    ).show()
+
+                    buildDashboard()
+                    openCodeEditor(bot)
+                } catch (e: Exception) {
+                    Toast.makeText(
+                        this,
+                        "Creation failed: ${e.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+            .show()
+    }
+
+    private fun openCodeEditor(bot: BotInfo) {
+        val root = java.io.File(bot.folder).canonicalFile
+        val file = java.io.File(root, bot.entryFile).canonicalFile
+
+        if (!file.path.startsWith(root.path + java.io.File.separator)) {
+            Toast.makeText(this, "Invalid project file", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val editor = EditText(this).apply {
+            setText(file.readText())
+            typeface = Typeface.MONOSPACE
+            textSize = 13f
+            gravity = Gravity.TOP or Gravity.START
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            minLines = 18
+            setHorizontallyScrolling(true)
+            inputType = InputType.TYPE_CLASS_TEXT or
+                InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        }
+
+        val scroll = ScrollView(this).apply {
+            addView(editor)
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("${bot.name} • main.py")
+            .setView(scroll)
+            .setNegativeButton("CLOSE", null)
+            .setPositiveButton("SAVE") { _, _ ->
+                try {
+                    file.writeText(editor.text.toString())
+                    Toast.makeText(
+                        this,
+                        "Code saved",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } catch (e: Exception) {
+                    Toast.makeText(
+                        this,
+                        "Save failed: ${e.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+            .show()
+    }
+
+
+    private fun openFileManager(bot: BotInfo) {
+        var currentDirectory = ""
+
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+        }
+
+        val navigationRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val locationLabel = label("PROJECT ROOT", 12f, white, true)
+        navigationRow.addView(
+            locationLabel,
+            LinearLayout.LayoutParams(0, -2, 1f)
+        )
+
+        val upButton = actionButton("UP", purple)
+        navigationRow.addView(upButton)
+        layout.addView(navigationRow)
+        layout.addView(space(6))
+
+        val fileList = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        val scroll = ScrollView(this).apply {
+            addView(fileList)
+        }
+
+        layout.addView(scroll, LinearLayout.LayoutParams(-1, dp(300)))
+
+        fun refreshFiles() {
+            fileList.removeAllViews()
+
+            locationLabel.text = if (currentDirectory.isBlank()) {
+                "PROJECT ROOT"
+            } else {
+                currentDirectory
+            }
+
+            upButton.visibility =
+                if (currentDirectory.isBlank()) View.GONE else View.VISIBLE
+
+            try {
+                val files = BotManager.listProjectFiles(bot, currentDirectory)
+
+                if (files.isEmpty()) {
+                    fileList.addView(
+                        label("This folder is empty.", 13f, muted)
+                    )
+                }
+
+                files.forEach { path ->
+                    val folder = path.endsWith("/")
+                    val row = LinearLayout(this@MainActivity).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER_VERTICAL
+                        setPadding(dp(3), dp(5), dp(3), dp(5))
+                    }
+
+                    val displayName = path.removeSuffix("/")
+                        .substringAfterLast("/")
+
+                    val itemLabel = label(
+                        (if (folder) "FOLDER  " else "FILE  ") + displayName,
+                        11f,
+                        white
+                    )
+
+                    row.addView(
+                        itemLabel,
+                        LinearLayout.LayoutParams(0, -2, 1f)
+                    )
+
+                    if (folder) {
+                        itemLabel.setOnClickListener {
+                            currentDirectory = path.removeSuffix("/")
+                            refreshFiles()
+                        }
+
+                        val open = actionButton("OPEN", cyan)
+                        open.setOnClickListener {
+                            currentDirectory = path.removeSuffix("/")
+                            refreshFiles()
+                        }
+                        row.addView(open)
+                    } else {
+                        val open = actionButton("OPEN", cyan)
+                        open.setOnClickListener {
+                            openManagedFile(bot, path)
+                        }
+                        row.addView(open)
+                    }
+
+                    val rename = actionButton("RENAME", purple)
+                    rename.setOnClickListener {
+                        val input = EditText(this@MainActivity).apply {
+                            setSingleLine(true)
+                            setText(displayName)
+                        }
+
+                        AlertDialog.Builder(this@MainActivity)
+                            .setTitle("Rename item")
+                            .setView(input)
+                            .setNegativeButton("CANCEL", null)
+                            .setPositiveButton("RENAME") { _, _ ->
+                                try {
+                                    BotManager.renameProjectItem(
+                                        bot,
+                                        path.removeSuffix("/"),
+                                        input.text.toString()
+                                    )
+                                    refreshFiles()
+                                } catch (e: Exception) {
+                                    Toast.makeText(
+                                        this@MainActivity,
+                                        e.message,
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                            .show()
+                    }
+                    row.addView(rename)
+
+                    val delete = actionButton("DELETE", red)
+                    delete.setOnClickListener {
+                        AlertDialog.Builder(this@MainActivity)
+                            .setTitle("Delete item?")
+                            .setMessage("Delete $displayName?")
+                            .setNegativeButton("CANCEL", null)
+                            .setPositiveButton("DELETE") { _, _ ->
+                                try {
+                                    BotManager.deleteProjectItem(
+                                        bot,
+                                        path.removeSuffix("/")
+                                    )
+                                    refreshFiles()
+                                } catch (e: Exception) {
+                                    Toast.makeText(
+                                        this@MainActivity,
+                                        e.message,
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                            .show()
+                    }
+                    row.addView(delete)
+
+                    fileList.addView(row)
+                }
+            } catch (e: Exception) {
+                fileList.addView(
+                    label("File error: ${e.message}", 12f, red)
+                )
+            }
+        }
+
+        upButton.setOnClickListener {
+            currentDirectory = currentDirectory
+                .substringBeforeLast("/", "")
+            refreshFiles()
+        }
+
+        fun createItem(directory: Boolean) {
+            val input = EditText(this@MainActivity).apply {
+                hint = if (directory) {
+                    "Folder name"
+                } else {
+                    "File name (e.g. config.py)"
+                }
+                setSingleLine(true)
+            }
+
+            AlertDialog.Builder(this@MainActivity)
+                .setTitle(if (directory) "Create folder" else "Create file")
+                .setView(input)
+                .setNegativeButton("CANCEL", null)
+                .setPositiveButton("CREATE") { _, _ ->
+                    try {
+                        val name = input.text.toString().trim()
+                        val path = if (currentDirectory.isBlank()) {
+                            name
+                        } else {
+                            "$currentDirectory/$name"
+                        }
+
+                        BotManager.createProjectFile(bot, path, directory)
+                        refreshFiles()
+                    } catch (e: Exception) {
+                        Toast.makeText(
+                            this@MainActivity,
+                            e.message,
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+                .show()
+        }
+
+        val createRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+
+        val newFile = actionButton("+ FILE", cyan)
+        newFile.setOnClickListener { createItem(false) }
+
+        val newFolder = actionButton("+ FOLDER", purple)
+        newFolder.setOnClickListener { createItem(true) }
+
+        createRow.addView(
+            newFile,
+            LinearLayout.LayoutParams(0, dp(44), 1f)
+        )
+        createRow.addView(spaceHorizontal(8))
+        createRow.addView(
+            newFolder,
+            LinearLayout.LayoutParams(0, dp(44), 1f)
+        )
+
+        layout.addView(createRow)
+
+        refreshFiles()
+
+        AlertDialog.Builder(this)
+            .setTitle("${bot.name} - FILE MANAGER")
+            .setView(layout)
+            .setPositiveButton("CLOSE", null)
+            .show()
+    }
+
+
+    private fun openSlashCommands(bot: BotInfo) {
+        try {
+            val commands = BotManager.getSlashCommands(bot)
+            val layout = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(14), dp(10), dp(14), dp(10))
+            }
+
+            layout.addView(label("SLASH COMMAND BUILDER", 16f, Color.WHITE, true))
+            layout.addView(space(5))
+            layout.addView(label("Create commands that users can run with / in Discord.", 13f, Color.LTGRAY))
+            layout.addView(space(12))
+
+            if (commands.length() == 0) {
+                layout.addView(label("No custom slash commands yet.", 14f, Color.LTGRAY))
+                layout.addView(space(10))
+            }
+
+            for (i in 0 until commands.length()) {
+                val item = commands.getJSONObject(i)
+                val name = item.optString("name")
+                val panel = card(Color.rgb(23, 32, 49)).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(dp(12), dp(10), dp(12), dp(10))
+                }
+
+                panel.addView(label("/$name", 15f, Color.WHITE, true))
+                panel.addView(space(3))
+                panel.addView(label(item.optString("description"), 12f, Color.LTGRAY))
+                panel.addView(space(8))
+
+                val edit = actionButton("EDIT COMMAND", purple)
+                edit.setOnClickListener { editSlashCommand(bot, item) }
+                panel.addView(edit)
+                panel.addView(space(5))
+
+                val delete = actionButton("DELETE COMMAND", Color.rgb(160, 55, 65))
+                delete.setOnClickListener {
+                    AlertDialog.Builder(this)
+                        .setTitle("Delete /$name?")
+                        .setMessage("Remove this command from the bot?")
+                        .setNegativeButton("CANCEL", null)
+                        .setPositiveButton("DELETE") { _, _ ->
+                            try {
+                                BotManager.deleteSlashCommand(bot, name)
+                                Toast.makeText(this, "Command deleted", Toast.LENGTH_SHORT).show()
+                                openSlashCommands(bot)
+                            } catch (e: Exception) {
+                                Toast.makeText(this, "Delete failed: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                        .show()
+                }
+                panel.addView(delete)
+                layout.addView(panel)
+                layout.addView(space(9))
+            }
+
+            val add = actionButton("+ NEW SLASH COMMAND", purple)
+            add.setOnClickListener { editSlashCommand(bot, null) }
+            layout.addView(add)
+
+            val scroll = ScrollView(this).apply { addView(layout) }
+            AlertDialog.Builder(this)
+                .setTitle("${bot.name} • SLASH COMMANDS")
+                .setView(scroll)
+                .setPositiveButton("CLOSE", null)
+                .show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Could not open commands: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun editSlashCommand(bot: BotInfo, existing: JSONObject?) {
+        val nameInput = EditText(this).apply {
+            hint = "Command name (example: hello)"
+            setSingleLine(true)
+            setText(existing?.optString("name") ?: "")
+        }
+
+        val descriptionInput = EditText(this).apply {
+            hint = "Description (example: Say hello)"
+            setSingleLine(true)
+            setText(existing?.optString("description") ?: "")
+        }
+
+        val codeInput = EditText(this).apply {
+            hint = "Python code for this command"
+            typeface = Typeface.MONOSPACE
+            textSize = 13f
+            gravity = Gravity.TOP or Gravity.START
+            minLines = 7
+            setHorizontallyScrolling(true)
+            inputType = InputType.TYPE_CLASS_TEXT or
+                InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            setText(existing?.optString("code") ?: """await interaction.response.send_message("Hello!")""")
+        }
+
+        val form = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(8), dp(16), dp(4))
+            addView(label("COMMAND NAME", 12f, Color.LTGRAY, true))
+            addView(nameInput)
+            addView(space(5))
+            addView(label("DESCRIPTION", 12f, Color.LTGRAY, true))
+            addView(descriptionInput)
+            addView(space(5))
+            addView(label("PYTHON CODE", 12f, Color.LTGRAY, true))
+            addView(codeInput)
+        }
+
+        val scroll = ScrollView(this).apply { addView(form) }
+
+        AlertDialog.Builder(this)
+            .setTitle(if (existing == null) "New Slash Command" else "Edit Slash Command")
+            .setView(scroll)
+            .setNegativeButton("CANCEL", null)
+            .setPositiveButton("SAVE") { _, _ ->
+                try {
+                    BotManager.saveSlashCommand(
+                        bot,
+                        nameInput.text.toString(),
+                        descriptionInput.text.toString(),
+                        codeInput.text.toString()
+                    )
+                    Toast.makeText(this, "Slash command saved", Toast.LENGTH_SHORT).show()
+                    openSlashCommands(bot)
+                } catch (e: Exception) {
+                    Toast.makeText(this, "Save failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+            .show()
+    }
+
+    private fun openManagedFile(bot: BotInfo, path: String) {
+        try {
+            val editor = EditText(this).apply {
+                setText(BotManager.readProjectFile(bot, path))
+                typeface = Typeface.MONOSPACE
+                textSize = 13f
+                gravity = Gravity.TOP or Gravity.START
+                minLines = 16
+                setHorizontallyScrolling(true)
+                inputType = InputType.TYPE_CLASS_TEXT or
+                    InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                    InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            }
+            val scroll = ScrollView(this).apply { addView(editor) }
+
+            AlertDialog.Builder(this)
+                .setTitle(path)
+                .setView(scroll)
+                .setNegativeButton("CLOSE", null)
+                .setPositiveButton("SAVE") { _, _ ->
+                    try {
+                        BotManager.writeProjectFile(bot, path, editor.text.toString())
+                        Toast.makeText(this, "File saved", Toast.LENGTH_SHORT).show()
+                    } catch (e: Exception) {
+                        Toast.makeText(this, "Save failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                }.show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Open failed: ${e.message}", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun label(
