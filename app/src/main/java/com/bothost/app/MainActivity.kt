@@ -42,6 +42,11 @@ class MainActivity : ComponentActivity() {
     private lateinit var importedCount: TextView
 
     private val statusViews = mutableMapOf<String, TextView>()
+    private lateinit var pageContent: LinearLayout
+    private var currentPage = "Home"
+    private var selectedWorkspaceBot: BotInfo? = null
+    private var workspaceSection = "Overview"
+
     private val handler = Handler(Looper.getMainLooper())
     private val statusExecutor = Executors.newSingleThreadScheduledExecutor()
 
@@ -168,474 +173,500 @@ class MainActivity : ComponentActivity() {
         }, 0, 2, TimeUnit.SECONDS)
     }
 
+
     private fun buildDashboard() {
         statusViews.clear()
-
-        val importedBots = BotManager.getBots(this)
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(bg)
         }
 
-        val scroll = ScrollView(this).apply {
-            isFillViewport = true
-        }
-
-        val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(22), dp(20), dp(24))
-        }
-
-        // Header
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(20), dp(18), dp(20), dp(14))
+            setBackgroundColor(bg)
         }
 
         val brand = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
+        brand.addView(label("B O T H O S T", 21f, cyan, true))
+        brand.addView(label("ANDROID BOT CONTROL CENTER", 10f, muted))
+        header.addView(brand, LinearLayout.LayoutParams(0, -2, 1f))
 
-        brand.addView(label("B O T H O S T", 22f, cyan, true))
-        brand.addView(label("ANDROID HOSTING CONTROL CENTER", 10f, muted))
-
-        header.addView(
-            brand,
-            LinearLayout.LayoutParams(0, -2, 1f)
-        )
-
-        val version = label("ALPHA 0.1", 10f, purple, true)
+        val version = label("ALPHA 0.2", 10f, purple, true)
         version.setPadding(dp(12), dp(8), dp(12), dp(8))
         version.background = rounded(panel2, 30)
         header.addView(version)
+        root.addView(header)
 
-        content.addView(header)
-        content.addView(space(24))
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+        }
 
-        // Welcome card
+        pageContent = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(12), dp(18), dp(24))
+        }
+
+        scroll.addView(pageContent)
+        root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+
+        val nav = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(dp(5), dp(10), dp(5), dp(10))
+            setBackgroundColor(Color.rgb(12, 19, 34))
+        }
+
+        listOf("Home", "Bots", "Console", "Settings").forEach { page ->
+            val item = label(
+                when (page) {
+                    "Home" -> "⌂\nHOME"
+                    "Bots" -> "▤\nBOTS"
+                    "Console" -> ">_\nCONSOLE"
+                    else -> "⚙\nSETTINGS"
+                },
+                10f,
+                if (currentPage == page) cyan else muted,
+                currentPage == page
+            )
+            item.gravity = Gravity.CENTER
+            item.setPadding(dp(5), dp(5), dp(5), dp(5))
+            item.setOnClickListener {
+                currentPage = page
+                selectedWorkspaceBot = null
+                buildDashboard()
+            }
+            nav.addView(item, LinearLayout.LayoutParams(0, -2, 1f))
+        }
+
+        root.addView(nav)
+        setContentView(root)
+
+        runningCount = TextView(this)
+        importedCount = TextView(this)
+        renderCurrentPage()
+    }
+
+    private fun renderCurrentPage() {
+        pageContent.removeAllViews()
+        statusViews.clear()
+
+        val bot = selectedWorkspaceBot
+        if (bot != null) {
+            renderWorkspace(bot)
+            return
+        }
+
+        when (currentPage) {
+            "Home" -> renderHome()
+            "Bots" -> renderBots()
+            "Console" -> renderConsole()
+            "Settings" -> renderSettings()
+        }
+    }
+
+    private fun sectionTitle(value: String) {
+        pageContent.addView(label(value, 13f, muted, true))
+        pageContent.addView(space(10))
+    }
+
+    private fun renderHome() {
+        val bots = BotManager.getBots(this)
+
         val hero = card(panel2).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(20), dp(18), dp(20))
         }
-
         hero.addView(label("YOUR BOT SERVER", 11f, muted, true))
         hero.addView(space(8))
-        hero.addView(label("Everything in one place.", 23f, white, true))
+        hero.addView(label("Welcome to BotHost.", 23f, white, true))
         hero.addView(space(6))
-        hero.addView(
-            label(
-                "Manage your Discord bots directly from your phone.",
-                13f,
-                muted
-            )
-        )
-        hero.addView(space(18))
+        hero.addView(label("Create, manage and host your Discord bots.", 13f, muted))
+        pageContent.addView(hero)
+        pageContent.addView(space(20))
 
-        content.addView(hero)
-        content.addView(space(22))
-
-        // Overview
-        content.addView(label("OVERVIEW", 13f, muted, true))
-        content.addView(space(10))
+        sectionTitle("OVERVIEW")
 
         val stats = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
         }
 
-        val runningCard = statCard("0", "RUNNING BOTS", cyan)
-        runningCount = runningCard.getChildAt(0) as TextView
+        val running = statCard("0", "RUNNING BOTS", cyan)
+        val total = statCard(bots.size.toString(), "APPLICATIONS", purple)
+        runningCount = running.getChildAt(0) as TextView
+        importedCount = total.getChildAt(0) as TextView
 
-        val importedCard = statCard(
-            importedBots.size.toString(),
-            "APPLICATIONS",
-            purple
-        )
-        importedCount = importedCard.getChildAt(0) as TextView
+        stats.addView(running, LinearLayout.LayoutParams(0, dp(105), 1f))
+        stats.addView(spaceHorizontal(10))
+        stats.addView(total, LinearLayout.LayoutParams(0, dp(105), 1f))
+        pageContent.addView(stats)
+        pageContent.addView(space(22))
 
-        stats.addView(
-            runningCard,
-            LinearLayout.LayoutParams(0, dp(105), 1f)
-        )
-
-        stats.addView(spaceHorizontal(12))
-
-        stats.addView(
-            importedCard,
-            LinearLayout.LayoutParams(0, dp(105), 1f)
-        )
-
-        content.addView(stats)
-        content.addView(space(22))
-
-        content.addView(space(22))
-
-        // Bot list header
-        val botsHeader = LinearLayout(this).apply {
+        val heading = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
+        heading.addView(label("MY APPLICATIONS", 13f, muted, true),
+            LinearLayout.LayoutParams(0, -2, 1f))
+        val add = actionButton("+ NEW", cyan)
+        add.setOnClickListener { createApplication() }
+        heading.addView(add)
+        pageContent.addView(heading)
+        pageContent.addView(space(10))
 
-        botsHeader.addView(
-            label("MY APPLICATIONS", 13f, muted, true),
-            LinearLayout.LayoutParams(0, -2, 1f)
-        )
+        if (bots.isEmpty()) {
+            pageContent.addView(label("No applications yet. Create your first bot in the Bots tab.", 13f, muted))
+        } else {
+            bots.take(3).forEach { bot ->
+                val item = card(panel).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(dp(14), dp(13), dp(14), dp(13))
+                }
+                item.addView(label(bot.name, 16f, white, true))
+                item.addView(space(4))
+                item.addView(label("${bot.runtime} • ${bot.entryFile}", 11f, muted))
+                item.addView(space(8))
+                val open = actionButton("OPEN WORKSPACE", cyan)
+                open.setOnClickListener { openWorkspace(bot) }
+                item.addView(open)
+                pageContent.addView(item)
+                pageContent.addView(space(9))
+            }
+        }
+    }
 
+    private fun renderBots() {
+        val bots = BotManager.getBots(this)
+
+        val heading = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        heading.addView(label("MY APPLICATIONS", 17f, white, true),
+            LinearLayout.LayoutParams(0, -2, 1f))
         val add = actionButton("+ NEW APPLICATION", cyan)
         add.setOnClickListener { createApplication() }
+        heading.addView(add)
+        pageContent.addView(heading)
+        pageContent.addView(space(15))
 
-        botsHeader.addView(add)
-        content.addView(botsHeader)
-        content.addView(space(10))
-
-        if (importedBots.isEmpty()) {
+        if (bots.isEmpty()) {
             val empty = card(panel).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
                 setPadding(dp(18), dp(25), dp(18), dp(25))
             }
-
             empty.addView(label("◈", 34f, cyan, true))
             empty.addView(space(8))
             empty.addView(label("No applications created yet", 16f, white, true))
-            empty.addView(space(6))
-            empty.addView(
-                label("Create your first bot application to get started.", 12f, muted)
-            )
+            empty.addView(space(5))
+            empty.addView(label("Create an application to open your bot workspace.", 12f, muted))
+            pageContent.addView(empty)
+            return
+        }
 
-            content.addView(empty)
-        } else {
-            importedBots.forEach { bot ->
+        bots.forEach { bot ->
+            val item = card(panel).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(15), dp(14), dp(15), dp(14))
+            }
+            item.addView(label(bot.name, 17f, white, true))
+            item.addView(space(4))
+            item.addView(label("${bot.runtime} • ${bot.entryFile}", 11f, muted))
+            item.addView(space(7))
 
-                val botPanel = card(panel).apply {
-                    orientation = LinearLayout.VERTICAL
-                    setPadding(dp(15), dp(14), dp(15), dp(14))
-                }
+            val status = label("STATUS: CHECKING", 10f, muted, true)
+            statusViews[bot.id] = status
+            item.addView(status)
+            item.addView(space(12))
 
-                botPanel.addView(label(bot.name, 16f, white, true))
-                botPanel.addView(space(5))
-                botPanel.addView(
-                    label("${bot.runtime} • ${bot.entryFile}", 11f, muted)
-                )
-                botPanel.addView(space(7))
+            val open = actionButton("OPEN WORKSPACE", cyan)
+            open.setOnClickListener { openWorkspace(bot) }
+            item.addView(open)
+            item.addView(space(8))
 
-                val status = label("STATUS: CHECKING", 10f, muted, true)
-                statusViews[bot.id] = status
-                botPanel.addView(status)
-
-                botPanel.addView(space(12))
-
-                val botButtons = LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                }
-
-                val startBot = actionButton("START", cyan)
-                startBot.setOnClickListener {
+            val controls = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+            }
+            val start = actionButton("START", cyan)
+            start.setOnClickListener {
+                if (bot.runtime != "Python") {
+                    Toast.makeText(this, "This runtime is not supported yet.", Toast.LENGTH_LONG).show()
+                } else if (TokenStore.getToken(this, bot.id).isNullOrBlank()) {
+                    Toast.makeText(this, "Set this bot's Discord token first.", Toast.LENGTH_LONG).show()
+                } else {
                     try {
-                        if (bot.runtime != "Python") {
-                            Toast.makeText(
-                                this,
-                                "This runtime is not supported yet.",
-                                Toast.LENGTH_LONG
-                            ).show()
-                        } else {
-                            if (TokenStore.getToken(this@MainActivity, bot.id).isNullOrBlank()) {
-                                Toast.makeText(
-                                    this@MainActivity,
-                                    "Set this bot's Discord token first.",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                                return@setOnClickListener
-                            }
-
-                            startServiceCommand(
-                                BotHostService.ACTION_START_BOT,
-                                bot.id
-                            )
-                            status.text = "STATUS: START REQUESTED"
-                            status.setTextColor(purple)
-                        }
-                    } catch (e: Exception) {
-                        Toast.makeText(
-                            this,
-                            "Start failed: ${e.message}",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                }
-
-                val stopBot = actionButton("STOP", purple)
-                stopBot.setOnClickListener {
-                    try {
-                        startServiceCommand(
-                            BotHostService.ACTION_STOP_BOT,
-                            bot.id
-                        )
-                        status.text = "STATUS: STOP REQUESTED"
+                        startServiceCommand(BotHostService.ACTION_START_BOT, bot.id)
+                        status.text = "STATUS: START REQUESTED"
                         status.setTextColor(purple)
                     } catch (e: Exception) {
-                        Toast.makeText(
-                            this,
-                            "Stop failed: ${e.message}",
-                            Toast.LENGTH_LONG
-                        ).show()
+                        Toast.makeText(this, "Start failed: ${e.message}", Toast.LENGTH_LONG).show()
                     }
                 }
-
-                val delete = actionButton("DELETE", red)
-                delete.setOnClickListener {
-                    AlertDialog.Builder(this@MainActivity)
-                        .setTitle("Delete ${bot.name}?")
-                        .setMessage(
-                            "BotHost will stop this bot before deleting its files and token."
-                        )
-                        .setNegativeButton("CANCEL", null)
-                        .setPositiveButton("DELETE") { _, _ ->
-                            delete.isEnabled = false
-                            delete.text = "STOPPING..."
-
-                            try {
-                                startServiceCommand(
-                                    BotHostService.ACTION_STOP_BOT,
-                                    bot.id
-                                )
-
-                                Thread {
-                                    try {
-                                        var stopped = false
-                                        val deadline = System.currentTimeMillis() + 25000
-
-                                        while (System.currentTimeMillis() < deadline) {
-                                            Thread.sleep(500)
-
-                                            val currentStatus =
-                                                BotRuntime.getStatus(this@MainActivity, bot.id)
-
-                                            if (currentStatus == "stopped") {
-                                                stopped = true
-                                                break
-                                            }
-                                        }
-
-                                        if (!stopped) {
-                                            throw IllegalStateException(
-                                                "Bot did not confirm shutdown. Nothing was deleted."
-                                            )
-                                        }
-
-                                        TokenStore.deleteToken(this@MainActivity, bot.id)
-                                        BotManager.deleteBot(this@MainActivity, bot.id)
-
-                                        handler.post {
-                                            Toast.makeText(
-                                                this@MainActivity,
-                                                "Bot stopped and deleted",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
-                                            buildDashboard()
-                                        }
-                                    } catch (e: Exception) {
-                                        handler.post {
-                                            delete.isEnabled = true
-                                            delete.text = "DELETE"
-                                            Toast.makeText(
-                                                this@MainActivity,
-                                                "Delete failed: ${e.message}",
-                                                Toast.LENGTH_LONG
-                                            ).show()
-                                        }
-                                    }
-                                }.start()
-                            } catch (e: Exception) {
-                                delete.isEnabled = true
-                                delete.text = "DELETE"
-                                Toast.makeText(
-                                    this@MainActivity,
-                                    "Stop request failed: ${e.message}",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            }
-                        }
-                        .show()
-                }
-
-                botButtons.addView(
-                    startBot,
-                    LinearLayout.LayoutParams(0, dp(44), 1f)
-                )
-                botButtons.addView(spaceHorizontal(6))
-                botButtons.addView(
-                    stopBot,
-                    LinearLayout.LayoutParams(0, dp(44), 1f)
-                )
-                botButtons.addView(spaceHorizontal(6))
-                botButtons.addView(
-                    delete,
-                    LinearLayout.LayoutParams(0, dp(44), 1f)
-                )
-
-                botPanel.addView(botButtons)
-
-                val tokenButton = actionButton("SET TOKEN", cyan)
-                tokenButton.setOnClickListener {
-                    val tokenInput = EditText(this@MainActivity).apply {
-                        inputType = InputType.TYPE_CLASS_TEXT or
-                            InputType.TYPE_TEXT_VARIATION_PASSWORD
-                        hint = "Paste this bot's Discord token"
-                        setSingleLine(true)
-                        setText(TokenStore.getToken(this@MainActivity, bot.id) ?: "")
-                    }
-
-                    AlertDialog.Builder(this@MainActivity)
-                        .setTitle("Discord token • ${bot.name}")
-                        .setMessage("This token is encrypted and stored on this device.")
-                        .setView(tokenInput)
-                        .setNegativeButton("CANCEL", null)
-                        .setNeutralButton("CLEAR") { _, _ ->
-                            TokenStore.deleteToken(this@MainActivity, bot.id)
-                            Toast.makeText(
-                                this@MainActivity,
-                                "Token cleared",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                        .setPositiveButton("SAVE") { _, _ ->
-                            val value = tokenInput.text.toString().trim()
-                            if (value.isNotEmpty()) {
-                                try {
-                                    TokenStore.saveToken(
-                                        this@MainActivity,
-                                        bot.id,
-                                        value
-                                    )
-                                    Toast.makeText(
-                                        this@MainActivity,
-                                        "Token saved securely",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                } catch (e: Exception) {
-                                    Toast.makeText(
-                                        this@MainActivity,
-                                        "Token save failed: ${e.message}",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                }
-                            } else {
-                                Toast.makeText(
-                                    this@MainActivity,
-                                    "Enter a token first",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        }
-                        .show()
-                }
-
-                content.addView(tokenButton)
-                content.addView(space(7))
-
-                val editCodeButton = actionButton("OPEN CODE EDITOR", purple)
-                editCodeButton.setOnClickListener {
-                    openCodeEditor(bot)
-                }
-                content.addView(editCodeButton)
-        content.addView(space(7))
-
-        val filesButton = actionButton("OPEN FILE MANAGER", cyan)
-        filesButton.setOnClickListener { openFileManager(bot) }
-        content.addView(filesButton)
-            content.addView(space(7))
-
-            val slashButton = actionButton("OPEN SLASH COMMANDS", purple)
-            slashButton.setOnClickListener { openSlashCommands(bot) }
-            content.addView(slashButton)
-                content.addView(space(8))
-                content.addView(botPanel)
-                content.addView(space(10))
             }
-        }
 
-        content.addView(space(22))
-
-        // Console preview
-        content.addView(label("CONSOLE", 13f, muted, true))
-        content.addView(space(10))
-
-        val console = card(Color.rgb(7, 11, 20)).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(14), dp(14), dp(14), dp(14))
-        }
-
-        console.addView(label("BOT HOST TERMINAL", 11f, cyan, true))
-        console.addView(space(10))
-        console.addView(
-            label("> BotHost dashboard initialized", 11f, white)
-        )
-        console.addView(
-            label("> Python runtime: configured", 11f, muted)
-        )
-        console.addView(
-            label("> Node.js runtime: not installed", 11f, muted)
-        )
-        console.addView(
-            label("> Status monitoring: active", 11f, green)
-        )
-
-        content.addView(console)
-
-        scroll.addView(content)
-        root.addView(
-            scroll,
-            LinearLayout.LayoutParams(-1, 0, 1f)
-        )
-
-        // Bottom navigation
-        val nav = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            setPadding(dp(8), dp(12), dp(8), dp(12))
-            setBackgroundColor(Color.rgb(12, 19, 34))
-        }
-
-        listOf(
-            "⌂\nHOME",
-            "▤\nBOTS",
-            ">_\nCONSOLE",
-            "⚙\nSETTINGS"
-        ).forEachIndexed { index, name ->
-
-            val item = label(
-                name,
-                11f,
-                if (index == 0) cyan else muted,
-                index == 0
-            )
-
-            item.gravity = Gravity.CENTER
-            item.setPadding(dp(8), dp(4), dp(8), dp(4))
-
-            nav.addView(
-                item,
-                LinearLayout.LayoutParams(0, -2, 1f)
-            )
-
-            item.setOnClickListener {
-                val section = listOf(
-                    "Home", "Bots", "Console", "Settings"
-                )[index]
-
-                Toast.makeText(
-                    this@MainActivity,
-                    "$section section is being developed.",
-                    Toast.LENGTH_SHORT
-                ).show()
+            val stop = actionButton("STOP", purple)
+            stop.setOnClickListener {
+                try {
+                    startServiceCommand(BotHostService.ACTION_STOP_BOT, bot.id)
+                    status.text = "STATUS: STOP REQUESTED"
+                    status.setTextColor(purple)
+                } catch (e: Exception) {
+                    Toast.makeText(this, "Stop failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
             }
-        }
 
-        root.addView(nav)
-        setContentView(root)
+            val delete = actionButton("DELETE", red)
+            delete.setOnClickListener { confirmDeleteBot(bot, delete) }
+
+            controls.addView(start, LinearLayout.LayoutParams(0, dp(44), 1f))
+            controls.addView(spaceHorizontal(6))
+            controls.addView(stop, LinearLayout.LayoutParams(0, dp(44), 1f))
+            controls.addView(spaceHorizontal(6))
+            controls.addView(delete, LinearLayout.LayoutParams(0, dp(44), 1f))
+            item.addView(controls)
+
+            pageContent.addView(item)
+            pageContent.addView(space(10))
+        }
     }
 
+    private fun confirmDeleteBot(bot: BotInfo, button: Button) {
+        AlertDialog.Builder(this)
+            .setTitle("Delete ${bot.name}?")
+            .setMessage("BotHost will stop this bot before deleting its files and token.")
+            .setNegativeButton("CANCEL", null)
+            .setPositiveButton("DELETE") { _, _ ->
+                button.isEnabled = false
+                button.text = "STOPPING..."
+                try {
+                    startServiceCommand(BotHostService.ACTION_STOP_BOT, bot.id)
+                    Thread {
+                        try {
+                            var stopped = false
+                            val deadline = System.currentTimeMillis() + 25000
+                            while (System.currentTimeMillis() < deadline) {
+                                Thread.sleep(500)
+                                if (BotRuntime.getStatus(this@MainActivity, bot.id) == "stopped") {
+                                    stopped = true
+                                    break
+                                }
+                            }
+                            if (!stopped) {
+                                throw IllegalStateException("Bot did not confirm shutdown. Nothing was deleted.")
+                            }
+                            TokenStore.deleteToken(this@MainActivity, bot.id)
+                            BotManager.deleteBot(this@MainActivity, bot.id)
+                            handler.post {
+                                Toast.makeText(this@MainActivity, "Bot stopped and deleted", Toast.LENGTH_SHORT).show()
+                                selectedWorkspaceBot = null
+                                buildDashboard()
+                            }
+                        } catch (e: Exception) {
+                            handler.post {
+                                button.isEnabled = true
+                                button.text = "DELETE"
+                                Toast.makeText(this@MainActivity, "Delete failed: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }.start()
+                } catch (e: Exception) {
+                    button.isEnabled = true
+                    button.text = "DELETE"
+                    Toast.makeText(this, "Stop request failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+            .show()
+    }
+
+    private fun openWorkspace(bot: BotInfo) {
+        selectedWorkspaceBot = bot
+        workspaceSection = "Overview"
+        renderCurrentPage()
+    }
+
+    private fun renderWorkspace(bot: BotInfo) {
+        val top = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val back = actionButton("‹ BOTS", panel2)
+        back.setOnClickListener {
+            selectedWorkspaceBot = null
+            currentPage = "Bots"
+            buildDashboard()
+        }
+        top.addView(back)
+        top.addView(spaceHorizontal(10))
+        top.addView(label(bot.name, 19f, white, true))
+        pageContent.addView(top)
+        pageContent.addView(space(8))
+        pageContent.addView(label("${bot.runtime} application • ${bot.entryFile}", 11f, muted))
+        pageContent.addView(space(16))
+
+        val sections = listOf("Overview", "Code", "Files", "Slash Commands", "Settings")
+        val sectionRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        sections.forEach { section ->
+            val button = actionButton(
+                section,
+                if (workspaceSection == section) cyan else panel2
+            )
+            button.textSize = 10f
+            button.setOnClickListener {
+                workspaceSection = section
+                renderCurrentPage()
+            }
+            sectionRow.addView(button, LinearLayout.LayoutParams(0, dp(42), 1f))
+        }
+        val horizontal = ScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(sectionRow)
+        }
+        pageContent.addView(horizontal)
+        pageContent.addView(space(18))
+
+        when (workspaceSection) {
+            "Overview" -> {
+                sectionTitle("BOT OVERVIEW")
+                val info = card(panel).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(dp(15), dp(15), dp(15), dp(15))
+                }
+                info.addView(label(bot.name, 18f, white, true))
+                info.addView(space(6))
+                info.addView(label("Runtime: ${bot.runtime}", 12f, muted))
+                info.addView(label("Entry file: ${bot.entryFile}", 12f, muted))
+                pageContent.addView(info)
+                pageContent.addView(space(12))
+
+                val start = actionButton("START BOT", cyan)
+                start.setOnClickListener {
+                    if (TokenStore.getToken(this, bot.id).isNullOrBlank()) {
+                        Toast.makeText(this, "Set this bot's token in Settings first.", Toast.LENGTH_LONG).show()
+                    } else {
+                        startServiceCommand(BotHostService.ACTION_START_BOT, bot.id)
+                    }
+                }
+                pageContent.addView(start)
+                pageContent.addView(space(8))
+                val stop = actionButton("STOP BOT", purple)
+                stop.setOnClickListener { startServiceCommand(BotHostService.ACTION_STOP_BOT, bot.id) }
+                pageContent.addView(stop)
+            }
+            "Code" -> {
+                sectionTitle("CODE EDITOR")
+                pageContent.addView(label("Edit your bot's main Python file.", 13f, muted))
+                pageContent.addView(space(12))
+                val edit = actionButton("OPEN CODE EDITOR", purple)
+                edit.setOnClickListener { openCodeEditor(bot) }
+                pageContent.addView(edit)
+            }
+            "Files" -> {
+                sectionTitle("FILE MANAGER")
+                pageContent.addView(label("Create, edit, rename and manage project files.", 13f, muted))
+                pageContent.addView(space(12))
+                val files = actionButton("OPEN FILE MANAGER", cyan)
+                files.setOnClickListener { openFileManager(bot) }
+                pageContent.addView(files)
+            }
+            "Slash Commands" -> {
+                sectionTitle("SLASH COMMAND BUILDER")
+                pageContent.addView(label("Create and manage your Discord slash commands.", 13f, muted))
+                pageContent.addView(space(12))
+                val commands = actionButton("OPEN SLASH COMMANDS", purple)
+                commands.setOnClickListener { openSlashCommands(bot) }
+                pageContent.addView(commands)
+            }
+            "Settings" -> {
+                sectionTitle("BOT SETTINGS")
+                val token = actionButton("MANAGE DISCORD TOKEN", cyan)
+                token.setOnClickListener { showTokenDialog(bot) }
+                pageContent.addView(token)
+                pageContent.addView(space(10))
+                val delete = actionButton("DELETE APPLICATION", red)
+                delete.setOnClickListener { confirmDeleteBot(bot, delete) }
+                pageContent.addView(delete)
+            }
+        }
+    }
+
+    private fun showTokenDialog(bot: BotInfo) {
+        val tokenInput = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            hint = "Paste this bot's Discord token"
+            setSingleLine(true)
+            setText(TokenStore.getToken(this@MainActivity, bot.id) ?: "")
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Discord token • ${bot.name}")
+            .setMessage("This token is encrypted and stored on this device.")
+            .setView(tokenInput)
+            .setNegativeButton("CANCEL", null)
+            .setNeutralButton("CLEAR") { _, _ ->
+                TokenStore.deleteToken(this@MainActivity, bot.id)
+                Toast.makeText(this, "Token cleared", Toast.LENGTH_SHORT).show()
+            }
+            .setPositiveButton("SAVE") { _, _ ->
+                val value = tokenInput.text.toString().trim()
+                if (value.isNotEmpty()) {
+                    try {
+                        TokenStore.saveToken(this@MainActivity, bot.id, value)
+                        Toast.makeText(this, "Token saved securely", Toast.LENGTH_SHORT).show()
+                    } catch (e: Exception) {
+                        Toast.makeText(this, "Token save failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                } else {
+                    Toast.makeText(this, "Enter a token first", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .show()
+    }
+
+    private fun renderConsole() {
+        sectionTitle("BOT CONSOLE")
+        val bots = BotManager.getBots(this)
+        if (bots.isEmpty()) {
+            pageContent.addView(label("No bot applications yet.", 13f, muted))
+            return
+        }
+        bots.forEach { bot ->
+            val panelView = card(Color.rgb(7, 11, 20)).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(13), dp(13), dp(13), dp(13))
+            }
+            panelView.addView(label(bot.name, 14f, cyan, true))
+            panelView.addView(space(8))
+            val logs = try {
+                BotRuntime.getLogs(this, bot.id)
+            } catch (_: Exception) {
+                "No logs available."
+            }
+            panelView.addView(label(logs.ifBlank { "No output yet." }, 11f, white))
+            pageContent.addView(panelView)
+            pageContent.addView(space(10))
+        }
+    }
+
+    private fun renderSettings() {
+        sectionTitle("SETTINGS")
+        val info = card(panel).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(15), dp(15), dp(15), dp(15))
+        }
+        info.addView(label("BOT HOST", 17f, white, true))
+        info.addView(space(6))
+        info.addView(label("Android bot hosting control center", 12f, muted))
+        info.addView(space(8))
+        info.addView(label("Your bot tokens remain encrypted using the existing secure storage system.", 12f, muted))
+        pageContent.addView(info)
+    }
 
     private fun createApplication() {
         val nameInput = EditText(this).apply {
@@ -661,8 +692,9 @@ class MainActivity : ComponentActivity() {
                         Toast.LENGTH_SHORT
                     ).show()
 
+                    currentPage = "Bots"
                     buildDashboard()
-                    openCodeEditor(bot)
+                    openWorkspace(bot)
                 } catch (e: Exception) {
                     Toast.makeText(
                         this,
