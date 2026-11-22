@@ -38,7 +38,7 @@ android {
 
 chaquopy {
     defaultConfig {
-        version = "3.13"
+        version = "3.12"
         pip {
             install("discord.py")
             install("python-dotenv")
